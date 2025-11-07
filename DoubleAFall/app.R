@@ -21,27 +21,133 @@ server <- function(input, output) {
   
   # read data
   # df_=readxl::read_excel("data/A Ball Scouting Reports.xlsx")
-  df_=readxl::read_excel("data/DoubleAFall.xlsx",sheet="Pitching")
+  df_hitting_=readxl::read_excel("data/DoubleAFall.xlsx",sheet="Hitting")
+  df_pitching_=readxl::read_excel("data/DoubleAFall.xlsx",sheet="Pitching")
   
   
-  df = reactive({
+  #####################
+  # Apply filtering
+  #####################
+  
+  df_hitting = reactive({
     
-    df_
+    # reactively filter to team
+    if(input$team != "All"){
+      df_hitting_=df_hitting_ %>% filter(Team==input$team)
+    }
     
+    df_hitting_
+  })
+  
+  df_pitching = reactive({
+    
+    # reactively filter to team
+    if(input$team != "All"){
+      df_pitching_=df_pitching_ %>% filter(Team==input$team)
+    }
+    
+    df_pitching_
   })
   
   
   
-  ######
+  #######################
   #display for raw data
+  #######################
+  
+  output$raw_hitting = renderDT(
+    {
+      df_hitting()
+    }
+  )
+  
+  output$raw_pitching = renderDT(
+    {
+      df_pitching()
+    }
+  )
+  
+  
+  ######
+  #display for aggregate pitching data
   ######
   
-  output$raw = renderDT(
-    {
-      
-      df()
-      
-    }
+  
+  agghitting=reactive({
+    # df=df_ %>% filter(Team=="Lugnuts")
+    
+    agghitting=df_hitting() %>% 
+      group_by(Team,Name) %>% 
+      summarize(games=n(),
+                order=round(mean(Order),2),
+                Hits=sum(Hits),
+                AB=sum(`At Bats`),
+                BB=sum(BB),
+                HBP=sum(HBP),
+                SO=sum(SO),
+                XBH=sum(XBH),
+                SB=sum(SB),
+                CS=sum(CS)
+      ) %>% 
+      ungroup() %>% 
+      mutate(AVG=round(Hits/AB,3),
+             OBP=round(((Hits+BB+HBP)/(AB+BB+HBP)),2),
+             `SO/G`=round(SO/games,2)
+      ) %>% 
+      arrange(desc(AVG)) %>% 
+      mutate(`Percentile (AVG)`=round(100*(nrow(.)-row_number())/nrow(.),2))
+    
+    agghitting
+    
+  })
+  
+  
+  output$agghitting = renderDT({
+    
+    agghitting()
+    
+  }, options = list(lengthChange = FALSE,paging = FALSE)
+  )
+  
+  
+  ############################ Pitching
+  
+  
+  aggpitching=reactive({
+    # df=df_ %>% filter(Team=="Lugnuts")
+    
+    aggpitching=df_pitching() %>% 
+      group_by(Team,Name) %>% 
+      summarize(games=n(),
+                order=round(mean(Order),2),
+                IP=round(sum(IP),2),
+                H=sum(H),
+                ER=sum(ER),
+                SO=sum(SO),
+                BB=sum(BB+HBP),
+                Pitches=sum(Pitches),
+                Strikes=sum(Strikes)
+      ) %>% 
+      ungroup() %>% 
+      mutate(`Strike%`=round(100*Strikes/Pitches,2),
+             `SO/IP`=round(SO/IP,2),
+             `BB/IP`=round(BB/IP,2),
+             ERA=round(9*ER/IP,2),
+             WHIP=(BB+H)/IP
+      ) %>% 
+      arrange(desc(IP)) 
+      # mutate(`Percentile (Strike%)`=round(100*(nrow(.)-row_number())/nrow(.),2))
+    
+    aggpitching
+    
+  })
+  
+  
+  output$aggpitching = renderDT({
+    
+    aggpitching()
+    
+  }, options = list(lengthChange = FALSE,paging = FALSE)
   )
   
   
@@ -65,13 +171,20 @@ server <- function(input, output) {
           
           selectInput("team", 
                       label = "Team", 
-                      choices = c("All",unique(df_$Team)), 
+                      choices = c("All",unique(df_pitching_$Team)), 
                       selected = "All")
           
         ),
         mainPanel(
           tabsetPanel(
-            tabPanel("Raw",DTOutput('raw'))
+            tabPanel("Hitting",
+                     DTOutput('agghitting')
+            ),
+            tabPanel("Pitching",
+                     DTOutput('aggpitching')
+            ),
+            tabPanel("Raw Hitting",DTOutput('raw_hitting')),
+            tabPanel("Raw Pitching",DTOutput('raw_pitching'))
           )#end tabsetpanel
         )#end mainpanel
       )#end sidebarlayout
