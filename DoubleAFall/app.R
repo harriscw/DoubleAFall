@@ -50,31 +50,74 @@ server <- function(input, output) {
   })
   
   
+  ######
+  # Display for team stuff
+  ######
   
-  #######################
-  #display for raw data
-  #######################
   
-  output$raw_hitting = renderDT(
-    {
-      df_hitting()
-    }
+  output$teamhitting = renderDT({
+    
+    teamhitting=df_hitting() %>% 
+      group_by(Team) %>% 
+      summarize(games=max(Game),
+                Hits=sum(Hits),
+                AB=sum(`At Bats`),
+                BB=sum(BB),
+                HBP=sum(HBP),
+                SO=sum(SO),
+                XBH=sum(XBH),
+                SB=sum(SB),
+                CS=sum(CS)
+      ) %>% 
+      ungroup() %>% 
+      mutate(AVG=round(Hits/AB,3),
+             OBP=round(((Hits+BB+HBP)/(AB+BB+HBP)),2),
+             `SO/G`=round(SO/games,2)
+      ) %>% 
+      arrange(desc(AVG)) 
+    
+    teamhitting
+    
+  }, options = list(lengthChange = FALSE,paging = FALSE)
   )
   
-  output$raw_pitching = renderDT(
-    {
-      df_pitching()
-    }
+  ####################################
+  
+  output$teampitching = renderDT({
+    
+    teampitching=df_pitching() %>% 
+      group_by(Team) %>% 
+      summarize(games=max(Game),
+                IP=round(sum(IP),2),
+                H=sum(H),
+                ER=sum(ER),
+                SO=sum(SO),
+                BB=sum(BB+HBP),
+                Pitches=sum(Pitches),
+                Strikes=sum(Strikes)
+      ) %>% 
+      ungroup() %>% 
+      mutate(`Strike%`=round(100*Strikes/Pitches,2),
+             `SO/IP`=round(SO/IP,2),
+             `BB/IP`=round(BB/IP,2),
+             ERA=round(9*ER/IP,2),
+             WHIP=round((BB+H)/IP,2)
+      ) %>% 
+      arrange(ERA)
+    
+    teampitching
+    
+  }, options = list(lengthChange = FALSE,paging = FALSE)
   )
+  
+  
   
   
   ######
   #display for aggregate pitching data
   ######
   
-  
-  agghitting=reactive({
-    # df=df_ %>% filter(Team=="Lugnuts")
+  output$agghitting = renderDT({
     
     agghitting=df_hitting() %>% 
       group_by(Team,Name) %>% 
@@ -99,22 +142,13 @@ server <- function(input, output) {
     
     agghitting
     
-  })
-  
-  
-  output$agghitting = renderDT({
-    
-    agghitting()
-    
   }, options = list(lengthChange = FALSE,paging = FALSE)
   )
   
   
   ############################ Pitching
   
-  
-  aggpitching=reactive({
-    # df=df_ %>% filter(Team=="Lugnuts")
+  output$aggpitching = renderDT({
     
     aggpitching=df_pitching() %>% 
       group_by(Team,Name) %>% 
@@ -133,21 +167,31 @@ server <- function(input, output) {
              `SO/IP`=round(SO/IP,2),
              `BB/IP`=round(BB/IP,2),
              ERA=round(9*ER/IP,2),
-             WHIP=(BB+H)/IP
+             WHIP=round((BB+H)/IP,2)
       ) %>% 
       arrange(desc(IP)) 
-      # mutate(`Percentile (Strike%)`=round(100*(nrow(.)-row_number())/nrow(.),2))
+    # mutate(`Percentile (Strike%)`=round(100*(nrow(.)-row_number())/nrow(.),2))
     
     aggpitching
     
-  })
-  
-  
-  output$aggpitching = renderDT({
-    
-    aggpitching()
-    
   }, options = list(lengthChange = FALSE,paging = FALSE)
+  )
+  
+  
+  #######################
+  #display for raw data
+  #######################
+  
+  output$raw_hitting = renderDT(
+    {
+      df_hitting()
+    }
+  )
+  
+  output$raw_pitching = renderDT(
+    {
+      df_pitching()
+    }
   )
   
   
@@ -177,6 +221,10 @@ server <- function(input, output) {
         ),
         mainPanel(
           tabsetPanel(
+            tabPanel("Team Stats",
+                     DTOutput('teamhitting'),
+                     DTOutput('teampitching')
+            ),
             tabPanel("Hitting",
                      DTOutput('agghitting')
             ),
